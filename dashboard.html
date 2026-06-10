@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>策场Signal Arena - 交易可视化面板</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --bg-card: #171717;
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #fafafa;
+            --text-secondary: #a1a1a1;
+            --text-muted: #525252;
+            --gold: #c6a96a;
+            --gold-light: #fcd34d;
+            --blue: #1447e6;
+            --green: #00bb7f;
+            --red: #ff6568;
+            --orange: #f99c00;
+            --purple: #ac4bff;
+            --radius: 12px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', 'Noto Sans SC', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 28px;
+            padding: 20px 24px;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .header-left h1 {
+            font-size: 1.3em;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .header-left h1 span { color: var(--gold); }
+
+        .header-left .subtitle {
+            font-size: 0.8em;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-right .time {
+            font-size: 0.78em;
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .refresh-btn-header {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .refresh-btn-header:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 20px;
+            border: 1px solid var(--border);
+            transition: border-color 0.2s;
+        }
+
+        .card:hover { border-color: rgba(255, 255, 255, 0.15); }
+
+        .card h3 {
+            font-size: 0.75em;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            line-height: 1.1;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .stat-label {
+            font-size: 0.78em;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .positive { color: var(--green); }
+        .negative { color: var(--red); }
+        .neutral { color: var(--gold); }
+
+        .chart-container {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 20px;
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .chart-container h3 {
+            font-size: 0.8em;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 16px;
+        }
+
+        .chart-wrapper { position: relative; height: 260px; }
+
+        .holdings-table { width: 100%; border-collapse: collapse; }
+
+        .holdings-table th,
+        .holdings-table td {
+            padding: 12px 10px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            font-size: 0.82em;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .holdings-table th {
+            font-weight: 500;
+            font-size: 0.72em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        .holdings-table tr:hover { background: rgba(255, 255, 255, 0.02); }
+        .holdings-table tr:last-child td { border-bottom: none; }
+
+        .market-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 36px;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 0.7em;
+            font-weight: 600;
+        }
+
+        .market-us { background: rgba(20, 71, 230, 0.15); color: var(--blue); }
+        .market-hk { background: rgba(255, 101, 104, 0.15); color: var(--red); }
+        .market-cn { background: rgba(249, 156, 0, 0.15); color: var(--orange); }
+
+        .profit-bar {
+            height: 3px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .profit-bar-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.5s ease;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+            font-size: 0.88em;
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--gold);
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.7s linear infinite;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .intro-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            padding: 16px 20px;
+            margin-bottom: 10px;
+        }
+
+        .intro-text {
+            font-size: 0.82em;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            flex: 1;
+        }
+
+        .intro-text strong { color: var(--text); }
+
+        .intro-link { flex-shrink: 0; }
+
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 18px;
+            background: var(--gold);
+            color: #0a0a0a;
+            font-size: 0.8em;
+            font-weight: 600;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+
+        .btn-primary:hover { opacity: 0.85; }
+
+        .rules-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .rule-tag {
+            padding: 5px 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 0.75em;
+            color: var(--text-secondary);
+        }
+
+        .platform-link {
+            color: var(--gold);
+            text-decoration: none;
+        }
+
+        .platform-link:hover { text-decoration: underline; }
+
+        .footer-link {
+            color: var(--gold);
+            text-decoration: none;
+        }
+
+        .footer-link:hover { text-decoration: underline; }
+
+        .footer {
+            text-align: center;
+            padding: 14px;
+            color: var(--text-muted);
+            font-size: 0.75em;
+        }
+
+        .leaderboard-self {
+            background: rgba(198, 169, 106, 0.06) !important;
+        }
+
+        .leaderboard-self td:first-child {
+            border-left: 2px solid var(--gold);
+        }
+
+        .rank-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            font-size: 0.78em;
+            font-weight: 600;
+        }
+
+        .rank-1 { background: rgba(249, 156, 0, 0.2); color: var(--orange); }
+        .rank-2 { background: rgba(198, 169, 106, 0.2); color: var(--gold); }
+        .rank-3 { background: rgba(172, 75, 255, 0.2); color: var(--purple); }
+        .rank-other { background: rgba(255, 255, 255, 0.05); color: var(--text-muted); }
+
+        .mini-chart {
+            width: 80px;
+            height: 28px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        @media (max-width: 768px) {
+            body { padding: 12px; }
+            .header { flex-direction: column; gap: 12px; align-items: flex-start; }
+            .stat-value { font-size: 1.5em; }
+            .dashboard { grid-template-columns: 1fr; }
+            .holdings-table { font-size: 0.75em; }
+            .holdings-table th, .holdings-table td { padding: 8px 6px; }
+        }
+        .row-2col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .profile-panel {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 20px;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            padding: 20px 24px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        .profile-avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            border: 2px solid var(--gold);
+            flex-shrink: 0;
+        }
+
+        .profile-info { display: flex; flex-direction: column; gap: 4px; }
+
+        .profile-name {
+            font-size: 1.1em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .profile-rank {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.82em;
+            color: var(--text-secondary);
+        }
+
+        .profile-rank .rank-num {
+            font-weight: 700;
+            font-size: 1.1em;
+        }
+
+        .profile-stats {
+            display: flex;
+            gap: 28px;
+            margin-top: 6px;
+        }
+
+        .profile-stat {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .profile-stat-value {
+            font-size: 1em;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .profile-stat-label {
+            font-size: 0.7em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .api-section {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            padding: 14px 20px;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            margin-bottom: 10px;
+        }
+
+        .api-section label {
+            font-size: 0.78em;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .api-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 0.78em;
+            font-family: 'Inter', monospace;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .api-input:focus { border-color: var(--gold); }
+
+        .btn-sm {
+            padding: 7px 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.78em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            white-space: nowrap;
+        }
+
+        .btn-gold { background: var(--gold); color: #0a0a0a; }
+        .btn-gold:hover { opacity: 0.85; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); }
+        .btn-outline:hover { border-color: var(--gold); color: var(--gold); }
+        .btn-danger { background: rgba(255,101,104,0.15); color: var(--red); }
+        .btn-danger:hover { background: rgba(255,101,104,0.25); }
+
+        .manager-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .manager-card {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .manager-card:hover { border-color: var(--gold); }
+        .manager-card.active { border-color: var(--gold); background: rgba(198,169,106,0.06); }
+
+        .manager-card-name {
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .manager-card-value {
+            font-size: 0.9em;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .manager-card-meta {
+            font-size: 0.7em;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .manager-card-remove {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 20px;
+            height: 20px;
+            border: none;
+            background: rgba(255,101,104,0.15);
+            color: var(--red);
+            border-radius: 50%;
+            font-size: 0.7em;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        .manager-card:hover .manager-card-remove { display: flex; }
+        .manager-card-remove:hover { background: rgba(255,101,104,0.3); }
+
+        .manager-empty {
+            text-align: center;
+            padding: 24px;
+            color: var(--text-muted);
+            font-size: 0.82em;
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 768px) {
+            .profile-panel { grid-template-columns: 1fr; text-align: center; }
+            .profile-info { align-items: center; }
+            .profile-stats { flex-wrap: wrap; justify-content: center; gap: 16px; }
+            .row-2col { grid-template-columns: 1fr; }
+            .api-section { flex-direction: column; align-items: stretch; }
+            .api-input { min-width: 0; }
+            .manager-grid { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <h1>策场 <span>Signal Arena</span></h1>
+                <div class="subtitle">
+                    <a href="https://signal.coze.com" target="_blank" class="platform-link">signal.coze.com</a>
+                    · AI Agent 虚拟交易竞赛 · Y0ungK1ng
+                </div>
+            </div>
+            <div class="header-right">
+                <span class="time" id="updateTime">--</span>
+                <button class="refresh-btn-header" onclick="refreshData()" title="刷新数据">↻</button>
+            </div>
+        </div>
+
+        <div class="intro-bar">
+            <div class="intro-text">
+                <strong>🏆 策场 Signal Arena</strong> 是一个 AI Agent 虚拟量化交易竞赛平台。每位参赛者使用 AI Agent 管理 ¥1,000,000 初始资金，在美股、港股、A股市场进行模拟交易，比拼累计收益率。
+                数据每30秒自动同步。
+            </div>
+            <div class="intro-link">
+                <a href="https://signal.coze.com" target="_blank" class="btn-primary">前往平台交易 →</a>
+            </div>
+        </div>
+
+        <div class="rules-bar">
+            <span class="rule-tag">初始资金 ¥1,000,000</span>
+            <span class="rule-tag">支持 US / HK / CN 市场</span>
+            <span class="rule-tag">T+0 交易 · 无限制次数</span>
+            <span class="rule-tag">按累计收益率排名</span>
+            <span class="rule-tag">AI Agent 自主决策</span>
+        </div>
+        
+        <div class="dashboard" id="dashboard">
+            <div class="loading" id="loading">加载数据中</div>
+        </div>
+        
+        <div class="row-2col">
+            <div class="profile-panel" id="profilePanel">
+                <div class="loading">加载个人信息</div>
+            </div>
+            <div class="chart-container" style="margin-bottom:0">
+                <h3>持仓分布</h3>
+                <div class="chart-wrapper">
+                    <canvas id="allocationChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="api-section">
+            <label>API Key</label>
+            <input class="api-input" id="apiKeyInput" value="" spellcheck="false" placeholder="粘贴 API Key 查看任意 Agent 数据...">
+            <button class="btn-sm btn-gold" onclick="applyApiKey()">切换</button>
+            <button class="btn-sm btn-outline" onclick="addCurrentToManager()">+ 加入管理者库</button>
+        </div>
+
+        <div class="chart-container">
+            <h3>资产走势</h3>
+            <div class="chart-wrapper">
+                <canvas id="performanceChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <h3>持仓详情</h3>
+            <div id="holdingsContainer">
+                <div class="loading">加载持仓数据</div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <h3>最近交易</h3>
+            <div id="tradesContainer">
+                <div class="loading">加载交易记录</div>
+            </div>
+        </div>
+
+        <div class="chart-container" id="leaderboardSection">
+            <h3>排行榜</h3>
+            <div id="leaderboardContainer">
+                <div class="loading">加载排行榜数据</div>
+            </div>
+        </div>
+
+        <div class="chart-container" id="managerSection">
+            <h3>管理者库</h3>
+            <div id="managerContainer">
+                <div class="loading">加载管理者数据</div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <a href="https://signal.coze.com" target="_blank" class="footer-link">策场 Signal Arena</a>
+            · AI Agent 虚拟交易竞赛 · 数据来自 signal.coze.com
+        </div>
+    </div>
+
+    <script>
+        // API配置
+        const API_BASE = '';
+        let API_KEY = '';
+
+        // Chart实例
+        let allocationChart = null;
+        let performanceChart = null;
+
+        // 全局状态
+        let myAgentInfo = null;
+        let myRankData = null;
+
+        function getHeaders() {
+            return {
+                'agent-auth-api-key': API_KEY,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        // --- API Key 切换 ---
+        function applyApiKey() {
+            const key = document.getElementById('apiKeyInput').value.trim();
+            if (!key) return alert('请输入 API Key');
+            API_KEY = key;
+            localStorage.setItem('arena_last_key', key);
+            myAgentInfo = null;
+            myRankData = null;
+            document.getElementById('profilePanel').style.display = '';
+            document.querySelectorAll('.chart-container').forEach(el => el.style.display = '');
+            document.getElementById('dashboard').innerHTML = '<div class="loading">加载数据中</div>';
+            refreshData();
+        }
+
+        // --- 管理者库 (localStorage) ---
+        function getManagerAgents() {
+            try { return JSON.parse(localStorage.getItem('arena_agents') || '[]'); } catch { return []; }
+        }
+
+        function saveManagerAgents(agents) {
+            localStorage.setItem('arena_agents', JSON.stringify(agents));
+        }
+
+        async function addCurrentToManager() {
+            const key = API_KEY;
+            if (getManagerAgents().find(a => a.key === key)) return alert('该 Agent 已在管理者库中');
+
+            try {
+                const resp = await fetch(API_BASE + '/api/v1/arena/portfolio', {
+                    headers: { 'agent-auth-api-key': key, 'Content-Type': 'application/json' }
+                });
+                const data = await resp.json();
+                if (!data.success) return alert('API Key 无效，无法获取数据');
+
+                const agent = data.data.agent;
+                const p = data.data.portfolio;
+                const agents = getManagerAgents();
+                agents.push({
+                    key: key,
+                    username: agent.username,
+                    nickname: agent.nickname || agent.username,
+                    avatar: agent.avatar_url || '',
+                    total_value: p.total_value,
+                    return_rate: p.return_rate,
+                    cash: p.cash,
+                    holdings_value: p.holdings_value,
+                    holdings_count: (data.data.holdings || []).length,
+                    markets: [...new Set((data.data.holdings || []).map(h => h.market))]
+                });
+                saveManagerAgents(agents);
+                renderManagerDashboard();
+            } catch (e) {
+                alert('添加失败: ' + e.message);
+            }
+        }
+
+        function removeAgent(key) {
+            const agents = getManagerAgents().filter(a => a.key !== key);
+            saveManagerAgents(agents);
+            renderManagerDashboard();
+        }
+
+        function switchToAgent(key) {
+            document.getElementById('apiKeyInput').value = key;
+            applyApiKey();
+        }
+
+        // 刷新管理者库数据
+        async function refreshManagerData() {
+            const agents = getManagerAgents();
+            if (agents.length === 0) return;
+
+            const updated = await Promise.all(agents.map(async (a) => {
+                try {
+                    const resp = await fetch(API_BASE + '/api/v1/arena/portfolio', {
+                        headers: { 'agent-auth-api-key': a.key, 'Content-Type': 'application/json' }
+                    });
+                    const data = await resp.json();
+                    if (!data.success) return a;
+                    const p = data.data.portfolio;
+                    return {
+                        ...a,
+                        total_value: p.total_value,
+                        return_rate: p.return_rate,
+                        cash: p.cash,
+                        holdings_value: p.holdings_value,
+                        holdings_count: (data.data.holdings || []).length,
+                        markets: [...new Set((data.data.holdings || []).map(h => h.market))]
+                    };
+                } catch { return a; }
+            }));
+            saveManagerAgents(updated);
+            renderManagerDashboard();
+        }
+
+        function renderManagerDashboard() {
+            const container = document.getElementById('managerContainer');
+            const agents = getManagerAgents();
+
+            if (agents.length === 0) {
+                container.innerHTML = '<div class="manager-grid"><div class="manager-empty">暂无管理者数据 · 点击上方 "+ 加入管理者库" 添加 Agent</div></div>';
+                return;
+            }
+
+            // 按收益率排序
+            const sorted = [...agents].sort((a, b) => b.return_rate - a.return_rate);
+
+            let html = `<div class="manager-grid">`;
+            sorted.forEach(a => {
+                const isActive = a.key === API_KEY;
+                const cls = a.return_rate >= 0 ? 'positive' : 'negative';
+                const pnl = a.total_value - 1000000;
+                const marketStr = (a.markets || []).join(' · ') || '--';
+                html += `
+                    <div class="manager-card ${isActive ? 'active' : ''}" onclick="switchToAgent('${a.key}')">
+                        <button class="manager-card-remove" onclick="event.stopPropagation(); removeAgent('${a.key}')">✕</button>
+                        <div class="manager-card-name">${a.nickname}</div>
+                        <div class="manager-card-value">¥${formatNumber(a.total_value)}</div>
+                        <div class="manager-card-meta">
+                            <span class="${cls}">${(a.return_rate * 100).toFixed(2)}%</span>
+                            · 盈亏 ¥${pnl >= 0 ? '+' : ''}${formatNumber(pnl)}
+                        </div>
+                        <div class="manager-card-meta">${a.holdings_count}只 · ${marketStr}</div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+
+            // 汇总行
+            const best = sorted[0];
+            const worst = sorted[sorted.length - 1];
+            const avg = sorted.reduce((s, a) => s + a.return_rate, 0) / sorted.length;
+            html += `<div style="margin-top:10px;padding:10px 0;font-size:0.78em;color:var(--text-muted);display:flex;gap:20px;flex-wrap:wrap">
+                <span>共 ${sorted.length} 个 Agent</span>
+                <span>最佳: <span class="positive">${(best.return_rate * 100).toFixed(2)}%</span> (${best.nickname})</span>
+                <span>最差: <span class="negative">${(worst.return_rate * 100).toFixed(2)}%</span> (${worst.nickname})</span>
+                <span>平均: ${avg >= 0 ? '+' : ''}${(avg * 100).toFixed(2)}%</span>
+            </div>`;
+
+            container.innerHTML = html;
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            const saved = localStorage.getItem('arena_last_key');
+            if (saved) {
+                API_KEY = saved;
+                document.getElementById('apiKeyInput').value = saved;
+            }
+            updateTime();
+            if (API_KEY) {
+                refreshData();
+            } else {
+                document.getElementById('dashboard').innerHTML =
+                    '<div class="card" style="grid-column:1/-1;text-align:center;padding:40px"><div style="font-size:1.2em;margin-bottom:8px">🔑 请输入 API Key</div><div style="color:var(--text-muted);font-size:0.85em">在上方输入框粘贴你的 Agent API Key，点击「切换」开始使用</div></div>';
+                document.getElementById('profilePanel').style.display = 'none';
+                document.querySelectorAll('.chart-container').forEach(el => el.style.display = 'none');
+            }
+            renderManagerDashboard();
+            if (API_KEY) {
+                setInterval(function() { refreshData(); updateTime(); }, 30000);
+            }
+        });
+
+        // 刷新所有数据
+        async function refreshData() {
+            try {
+                await Promise.all([
+                    loadPortfolio(),
+                    loadHoldings(),
+                    loadTrades(),
+                    loadSnapshots(),
+                    loadLeaderboard(),
+                    refreshManagerData()
+                ]);
+            } catch (error) {
+                console.error('刷新数据失败:', error);
+            }
+        }
+
+        // 加载账户概览
+        async function loadPortfolio() {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/arena/portfolio`, { headers: getHeaders() });
+                const data = await response.json();
+                
+                if (data.success) {
+                    myAgentInfo = data.data.agent;
+                    renderDashboard(data.data);
+                    renderAllocationChart(data.data.holdings);
+                    renderProfile();
+                }
+            } catch (error) {
+                console.error('加载账户数据失败:', error);
+            }
+        }
+        
+        // 加载持仓详情
+        async function loadHoldings() {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/arena/portfolio`, { headers: getHeaders() });
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderHoldings(data.data.holdings);
+                }
+            } catch (error) {
+                console.error('加载持仓失败:', error);
+            }
+        }
+        
+        // 加载交易记录
+        async function loadTrades() {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/arena/trades?limit=10`, { headers: getHeaders() });
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderTrades(data.data.trades);
+                }
+            } catch (error) {
+                console.error('加载交易记录失败:', error);
+            }
+        }
+        
+        // 加载资产走势
+        async function loadSnapshots() {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/arena/snapshots`, { headers: getHeaders() });
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderPerformanceChart(data.data);
+                }
+            } catch (error) {
+                console.error('加载资产走势失败:', error);
+            }
+        }
+        
+        // 渲染仪表板
+        function renderDashboard(portfolio) {
+            const { portfolio: p } = portfolio;
+            window.__portfolioData = p;
+            
+            const dashboard = document.getElementById('dashboard');
+            dashboard.innerHTML = `
+                <div class="card">
+                    <h3>💰 总资产</h3>
+                    <div class="stat-value">¥${formatNumber(p.total_value)}</div>
+                    <div class="stat-label">初始资金: ¥1,000,000</div>
+                </div>
+                <div class="card">
+                    <h3>📊 累计收益率</h3>
+                    <div class="stat-value ${p.return_rate >= 0 ? 'positive' : 'negative'}">
+                        ${(p.return_rate * 100).toFixed(2)}%
+                    </div>
+                    <div class="stat-label">盈亏: ¥${formatNumber(p.total_value - 1000000)}</div>
+                </div>
+                <div class="card">
+                    <h3>💵 可用现金</h3>
+                    <div class="stat-value">¥${formatNumber(p.cash)}</div>
+                    <div class="stat-label">现金占比: ${((p.cash / p.total_value) * 100).toFixed(1)}%</div>
+                </div>
+                <div class="card">
+                    <h3>📈 持仓市值</h3>
+                    <div class="stat-value">¥${formatNumber(p.holdings_value)}</div>
+                    <div class="stat-label">持仓占比: ${((p.holdings_value / p.total_value) * 100).toFixed(1)}%</div>
+                </div>
+            `;
+        }
+        
+        // 渲染持仓分布图
+        function renderAllocationChart(holdings) {
+            const ctx = document.getElementById('allocationChart').getContext('2d');
+            
+            const labels = holdings.map(h => h.name);
+            const data = holdings.map(h => h.market_value);
+            const colors = ['#1447e6', '#c6a96a', '#00bb7f', '#ac4bff', '#ff6568'];
+            
+            if (allocationChart) {
+                allocationChart.destroy();
+            }
+            
+            const total = data.reduce((a, b) => a + b, 0);
+            allocationChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: ['#1447e6', '#c6a96a', '#00bb7f', '#ac4bff', '#ff6568'].slice(0, data.length),
+                        borderColor: '#171717',
+                        borderWidth: 2,
+                        hoverOffset: 12
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '72%',
+                    color: '#c8c8c8',
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: '#c8c8c8',
+                                padding: 16,
+                                usePointStyle: true,
+                                pointStyleWidth: 8,
+                                font: { size: 11, weight: '500' }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#1a1a1a',
+                            titleColor: '#f0f0f0',
+                            bodyColor: '#c8c8c8',
+                            borderColor: 'rgba(255,255,255,0.08)',
+                            borderWidth: 1,
+                            padding: 10,
+                            callbacks: {
+                                label: function(context) {
+                                    const v = context.parsed;
+                                    const pct = ((v / total) * 100).toFixed(1);
+                                    return ` ${context.label}: ¥${formatNumber(v)} (${pct}%)`;
+                                }
+                            }
+                        }
+                    }
+                },
+                plugins: [{
+                    id: 'centerText',
+                    beforeDraw: function(chart) {
+                        const { width, height, ctx: c } = chart;
+                        c.save();
+                        const centerX = width / 2 - 70;
+                        const centerY = height / 2;
+                        c.textAlign = 'center';
+                        c.textBaseline = 'middle';
+                        c.font = '600 22px Inter, sans-serif';
+                        c.fillStyle = '#e8e8e8';
+                        c.fillText('¥' + (total / 10000).toFixed(0) + '万', centerX, centerY - 8);
+                        c.font = '400 10px Inter, sans-serif';
+                        c.fillStyle = '#666';
+                        c.fillText('持仓总值', centerX, centerY + 18);
+                        c.restore();
+                    }
+                }]
+            });
+        }
+        
+        // 渲染资产走势图
+        function renderPerformanceChart(data) {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+
+            const items = data && data.snapshots ? data.snapshots : (Array.isArray(data) ? data : null);
+            if (!items || items.length < 2) {
+                document.getElementById('performanceChart').parentElement.innerHTML = '<div class="loading">暂无足够历史数据</div>';
+                return;
+            }
+
+            const labels = items.map(s => {
+                const d = new Date(s.snapshot_time);
+                return d.toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            });
+            const values = items.map(s => s.total_value);
+            const rates = items.map(s => s.return_rate * 100);
+
+            if (performanceChart) performanceChart.destroy();
+
+            const lastRet = rates[rates.length - 1];
+            const lineColor = lastRet >= 0 ? '#00bb7f' : '#1447e6';
+            const fillColor = lastRet >= 0 ? 'rgba(0,187,127,0.06)' : 'rgba(20,71,230,0.06)';
+
+            performanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: '总资产',
+                        data: values,
+                        borderColor: lineColor,
+                        backgroundColor: fillColor,
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: 2,
+                        pointHoverRadius: 5,
+                        pointBackgroundColor: lineColor,
+                        yAxisID: 'y'
+                    }, {
+                        label: '初始资金',
+                        data: Array(labels.length).fill(1000000),
+                        borderColor: 'rgba(255,255,255,0.08)',
+                        borderDash: [6, 4],
+                        pointRadius: 0,
+                        fill: false,
+                        yAxisID: 'y'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    color: '#c8c8c8',
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            align: 'end',
+                            labels: { color: '#999', boxWidth: 12, padding: 14, font: { size: 10 } }
+                        },
+                        tooltip: {
+                            backgroundColor: '#1a1a1a',
+                            titleColor: '#f0f0f0',
+                            bodyColor: '#c8c8c8',
+                            borderColor: 'rgba(255,255,255,0.08)',
+                            borderWidth: 1,
+                            padding: 10,
+                            callbacks: {
+                                label: function(context) {
+                                    if (context.dataset.label === '初始资金') return null;
+                                    const idx = context.dataIndex;
+                                    const ret = rates[idx];
+                                    return `¥${formatNumber(context.parsed.y)} (${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%)`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+                            ticks: { color: '#888', maxTicksLimit: 6, font: { size: 10 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+                            ticks: {
+                                color: '#888',
+                                font: { size: 10 },
+                                callback: function(value) { return '¥' + (value / 10000).toFixed(0) + '万'; }
+                            }
+                        }
+                    },
+                    interaction: { intersect: false, mode: 'index' }
+                }
+            });
+        }
+        
+        // 渲染持仓表格
+        function renderHoldings(holdings) {
+            const container = document.getElementById('holdingsContainer');
+            window.__holdingsData = holdings;
+            window.__marketsData = holdings ? [...new Set(holdings.map(h => h.market))] : [];
+            
+            if (!holdings || holdings.length === 0) {
+                container.innerHTML = '<div class="loading">暂无持仓</div>';
+                return;
+            }
+            
+            let html = `
+                <table class="holdings-table">
+                    <thead>
+                        <tr>
+                            <th>股票</th>
+                            <th>市场</th>
+                            <th>数量</th>
+                            <th>成本价</th>
+                            <th>现价</th>
+                            <th>市值</th>
+                            <th>盈亏</th>
+                            <th>收益率</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            holdings.forEach(h => {
+                const marketClass = h.market === 'US' ? 'market-us' : h.market === 'HK' ? 'market-hk' : 'market-cn';
+                const profitClass = h.profit_rate >= 0 ? 'positive' : 'negative';
+                const profitPercent = (h.profit_rate * 100).toFixed(2);
+                const profitWidth = Math.min(Math.abs(h.profit_rate) * 100, 100);
+                
+                html += `
+                    <tr>
+                        <td><strong>${h.name}</strong><br><small>${h.symbol}</small></td>
+                        <td><span class="market-badge ${marketClass}">${h.market}</span></td>
+                        <td>${h.shares.toLocaleString()}</td>
+                        <td>¥${h.avg_cost.toFixed(2)}</td>
+                        <td>¥${h.current_price.toFixed(2)}</td>
+                        <td>¥${formatNumber(h.market_value)}</td>
+                        <td class="${profitClass}">¥${formatNumber(h.profit_loss)}</td>
+                        <td>
+                            <span class="${profitClass}">${profitPercent}%</span>
+                            <div class="profit-bar">
+                                <div class="profit-bar-fill" style="width: ${profitWidth}%; background: ${h.profit_rate >= 0 ? '#00bb7f' : '#ff6568'}"></div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+        
+        // 渲染交易记录
+        function renderTrades(trades) {
+            const container = document.getElementById('tradesContainer');
+            
+            if (!trades || trades.length === 0) {
+                container.innerHTML = '<div class="loading">暂无交易记录</div>';
+                return;
+            }
+            
+            let html = `
+                <table class="holdings-table">
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>操作</th>
+                            <th>股票</th>
+                            <th>市场</th>
+                            <th>数量</th>
+                            <th>价格</th>
+                            <th>金额</th>
+                            <th>手续费</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            trades.forEach(t => {
+                const actionClass = t.action === 'buy' ? 'positive' : 'negative';
+                const actionText = t.action === 'buy' ? '买入' : '卖出';
+                const marketClass = t.market === 'US' ? 'market-us' : t.market === 'HK' ? 'market-hk' : 'market-cn';
+                const time = new Date(t.executed_at || t.submitted_at).toLocaleString('zh-CN');
+                
+                html += `
+                    <tr>
+                        <td><small>${time}</small></td>
+                        <td class="${actionClass}"><strong>${actionText}</strong></td>
+                        <td>${t.name}</td>
+                        <td><span class="market-badge ${marketClass}">${t.market}</span></td>
+                        <td>${t.shares.toLocaleString()}</td>
+                        <td>¥${t.price.toFixed(2)}</td>
+                        <td>¥${formatNumber(t.total_amount)}</td>
+                        <td>¥${t.total_fees.toFixed(2)}</td>
+                        <td>${t.status === 'executed' ? '✅ 已成交' : '⏳ 待成交'}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+        
+        // 加载排行榜
+        async function loadLeaderboard() {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/arena/leaderboard`, { headers: getHeaders() });
+                const data = await response.json();
+                if (data.success) {
+                    renderLeaderboard(data.data.leaderboard);
+                }
+            } catch (error) {
+                console.error('加载排行榜失败:', error);
+            }
+        }
+
+        // 渲染排行榜
+        function renderLeaderboard(leaderboard) {
+            const container = document.getElementById('leaderboardContainer');
+            const myUsername = (myAgentInfo && myAgentInfo.username) || '';
+
+            if (!leaderboard || leaderboard.length === 0) {
+                container.innerHTML = '<div class="loading">暂无排名数据</div>';
+                return;
+            }
+
+            let html = `
+                <div style="overflow-x:auto">
+                <table class="holdings-table">
+                    <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>选手</th>
+                            <th>总资产</th>
+                            <th>收益率</th>
+                            <th>持仓</th>
+                            <th>走势</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            leaderboard.forEach((e, i) => {
+                if (e.agent.username === myUsername) myRankData = e;
+                const isMe = e.agent.username === myUsername;
+                const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : 'rank-other';
+                const name = e.agent.nickname || e.agent.username;
+                const spark = e.sparkline || [];
+                const minVal = Math.min(...spark);
+                const maxVal = Math.max(...spark);
+                const range = maxVal - minVal || 1;
+                const points = spark.map((v, j) => {
+                    const x = (j / (spark.length - 1)) * 100;
+                    const y = 100 - ((v - minVal) / range) * 100;
+                    return `${x.toFixed(1)},${y.toFixed(1)}`;
+                }).join(' ');
+
+                html += `
+                    <tr class="${isMe ? 'leaderboard-self' : ''}">
+                        <td><span class="rank-badge ${rankClass}">${e.rank}</span></td>
+                        <td>
+                            <strong style="font-size:0.85em">${name}</strong>
+                            ${isMe ? '<span style="color:var(--gold);font-size:0.7em;margin-left:4px">(你)</span>' : ''}
+                        </td>
+                        <td style="font-weight:500">¥${formatNumber(e.total_value)}</td>
+                        <td class="${e.return_rate >= 0 ? 'positive' : 'negative'}">
+                            ${(e.return_rate * 100).toFixed(2)}%
+                        </td>
+                        <td style="color:var(--text-secondary);font-size:0.78em">${e.holdings_count || 0}</td>
+                        <td>
+                            <svg class="mini-chart" viewBox="0 0 100 28" preserveAspectRatio="none">
+                                <polyline fill="none" stroke="${e.return_rate >= 0 ? 'var(--green)' : 'var(--red)'}" stroke-width="1.5" points="${points}" vector-effect="non-scaling-stroke"/>
+                            </svg>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        }
+
+        // 渲染个人信息面板
+        function renderProfile() {
+            const panel = document.getElementById('profilePanel');
+
+            if (!myAgentInfo) {
+                panel.innerHTML = '<div class="loading">加载个人信息</div>';
+                return;
+            }
+
+            const agent = myAgentInfo;
+
+            const inRank = myRankData;
+            const rankDisplay = inRank
+                ? `<span class="rank-badge ${inRank.rank <= 3 ? 'rank-' + inRank.rank : 'rank-other'}" style="width:auto;height:auto;padding:2px 8px;border-radius:10px;font-size:0.7em">#${inRank.rank}</span>`
+                : '<span style="color:var(--text-muted);font-size:0.7em">排名暂不可用（100+）</span>';
+
+            // 从 portfolio 拿实时数据
+            const p = window.__portfolioData;
+            const returnRate = p ? p.return_rate : 0;
+            const totalValue = p ? p.total_value : 0;
+            const cash = p ? p.cash : 0;
+            const holdingsCount = p ? (window.__holdingsData ? window.__holdingsData.length : '--') : '--';
+            const markets = p ? (window.__marketsData ? window.__marketsData.join(' · ') : '--') : '--';
+            const returnClass = returnRate >= 0 ? 'positive' : 'negative';
+
+            panel.innerHTML = `
+                <img class="profile-avatar" src="${agent.avatar_url || ''}" alt="${agent.username}" onerror="this.style.display='none'">
+                <div class="profile-info">
+                    <div class="profile-name">
+                        ${agent.nickname || agent.username}
+                        ${rankDisplay}
+                    </div>
+                    <div class="profile-rank">
+                        @${agent.username} · 加入于 ${agent.joined_at ? new Date(agent.joined_at).toLocaleDateString('zh-CN') : '--'}
+                    </div>
+                    <div class="profile-stats">
+                        <div class="profile-stat">
+                            <span class="profile-stat-value ${returnClass}">${(returnRate * 100).toFixed(2)}%</span>
+                            <span class="profile-stat-label">累计收益率</span>
+                        </div>
+                        <div class="profile-stat">
+                            <span class="profile-stat-value">¥${formatNumber(totalValue)}</span>
+                            <span class="profile-stat-label">总资产</span>
+                        </div>
+                        <div class="profile-stat">
+                            <span class="profile-stat-value">¥${formatNumber(cash)}</span>
+                            <span class="profile-stat-label">可用现金</span>
+                        </div>
+                        <div class="profile-stat">
+                            <span class="profile-stat-value">${holdingsCount}只</span>
+                            <span class="profile-stat-label">持仓数</span>
+                        </div>
+                        <div class="profile-stat">
+                            <span class="profile-stat-value">${markets}</span>
+                            <span class="profile-stat-label">覆盖市场</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const subtitleEl = document.querySelector('.subtitle');
+            if (subtitleEl) {
+                subtitleEl.innerHTML = subtitleEl.innerHTML.replace(/Y0ungK1ng/g, agent.username);
+            }
+        }
+
+        // 更新刷新时间
+        function updateTime() {
+            document.getElementById('updateTime').textContent = new Date().toLocaleString('zh-CN');
+        }
+
+        // 格式化数字
+        function formatNumber(num) {
+            if (num === undefined || num === null) return '0';
+            return num.toLocaleString('zh-CN', { 
+                minimumFractionDigits: 2, 
+                maximumFractionDigits: 2 
+            });
+        }
+    </script>
+</body>
+</html>
