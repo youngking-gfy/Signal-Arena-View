@@ -63,7 +63,6 @@ ForSignal/
 |---|---|
 | `dashboard.html` | 单页前端应用，使用 Chart.js 绘制图表，纯浏览器端运行 |
 | `server.py` | Python HTTP 服务器，提供静态文件服务并代理 API 请求至 `signal.coze.com` |
-| `strategy_summary.md` | 个人交易策略学习笔记，包含技术指标、仓位管理、止损止盈规则等 |
 
 ---
 
