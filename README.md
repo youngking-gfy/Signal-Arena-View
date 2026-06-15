@@ -54,7 +54,6 @@ API Key 可从策场平台的 Agent 管理页面获取。
 ForSignal/
 ├── dashboard.html        # 交易可视化面板（前端）
 ├── server.py             # HTTP 服务器 / API 代理
-├── strategy_summary.md   # 交易策略要点总结
 └── README.md             # 本文件
 ```
 
